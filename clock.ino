@@ -39,6 +39,9 @@ bool rainbow = LOW;
 bool fluid = LOW;
 
 class LEDClass {
+  /*
+   * Every LED is an instance of this.
+   */
   private:
     byte ID;
     byte tempRed = 0, tempGreen = 0, tempBlue = 0;
@@ -46,7 +49,7 @@ class LEDClass {
     void setID(byte IDnum) {
       ID = IDnum;
     }
-    void addTempColor(byte r, byte g, byte b) {   //method for blending multiple colors, takes highest R, G, B values
+    void addTempColor(byte r, byte g, byte b) {   // method for blending multiple colors, takes highest R, G, B values
       if (r > tempRed) tempRed = r;
       if (g > tempGreen) tempGreen = g;
       if (b > tempBlue) tempBlue = b;
@@ -117,15 +120,18 @@ void changeColors() {     //runs on startup and 12:
 }
 
 byte getAmbientLight() {
-  static int rawLightLevel = 1024;    // 1024: begin at 0 brightness
-  static byte hysterisis = 25;        // 25 light levels out of 1024
+  /*
+   * Returns a brightness 0-255
+   */
+  static int rawLightLevel = 1024;                        // 1024: begin at 0 brightness
+  static byte hysterisis = 25;                            // 25 light levels out of 1024
   if (analogRead(A0) > rawLightLevel + hysterisis) rawLightLevel += 1;
   else if (analogRead(A0) < rawLightLevel - hysterisis) rawLightLevel -= 1;
-  int lightLevel = map(rawLightLevel, 250, 1000, 255, 0);
-  lightLevel = constrain(lightLevel, 3, 255);
+  int lightLevel = map(rawLightLevel, 250, 800, 255, 0);  // inverts and scales
+  lightLevel = constrain(lightLevel, 3, 255);             // '3' prevents clipping at very low light
   if (second_flag) {
     Serial.print("Brightness: "); Serial.print(rawLightLevel); Serial.print(" => "); Serial.println(lightLevel);
-    Serial.println("======================");
+    Serial.println("");
   }
   if (autoSmoothHands) {
     if (lightLevel <= 5) smoothHands = LOW;   //automatically disable smoothing in very low light (avoids flickering)
@@ -134,7 +140,11 @@ byte getAmbientLight() {
   return lightLevel;
 }
 
-void setRainbowColors() {   //counterpart of changeColors() function,
+void setRainbowColors() {
+  /*
+   * Sets LED instance colors to the 'rainbow' scheme
+   *  - counterpart of changeColors() function
+   */
   static byte oldSecond;
   if (secondLED != oldSecond) {
     oldSecond = secondLED;
@@ -150,6 +160,9 @@ void setRainbowColors() {   //counterpart of changeColors() function,
 }
 
 void setFluidColors() {
+  /*
+   * Sets LED colors to 'fluid' scheme
+   */
   static byte oldSecond;
   static byte i = random(60);
   if (secondLED != oldSecond) {
@@ -197,30 +210,34 @@ byte rainbowB(byte i) {
 }
 
 void updateClock() {
+  /*
+   * Read time from RTC module and set global time variables
+   */
   static int oldSecond = 0;
   DateTime now = rtc.now();
-//  hourLED = now.hour();
-//  hourLED = (now.hour() * 5 % 60) + interpolateHour ? minuteLED/12 : 0;
   secondLED = now.second();
   minuteLED = now.minute();
   hourLED = now.hour() % 12 * 5 + (interpolateHour ? now.minute()/12 : 0);
   if (oldSecond != secondLED) {
     Serial.print("The time is "); Serial.print(hourLED/5); Serial.print(":"); Serial.print(now.minute()); Serial.print(":"); Serial.println(now.second());
     oldSecond = secondLED;
-    second_flag = 1;   //tell getAmbientLight to print
+    second_flag = 1;   // tell getAmbientLight to print
   }
   else second_flag = 0;
 }
 
 void setHands() {
-  if (rainbow) setRainbowColors();    //configures rainbow in real time
+  /*
+   * Assign colors to LED objects according to the 'hands'
+   */
+  if (rainbow) setRainbowColors();            // configures rainbow in real time
   if (fluid) setFluidColors();
   for (byte i = 0; i < 60; i++) {
     if (i % (60/boldMarkers) == 0)
       LED[i].addTempColor(markerColors[0][0], markerColors[0][1], markerColors[0][2]);    //set bold markers
     if (i % (60/markers) == 0)
       LED[i].addTempColor(markerColors[1][0], markerColors[1][1], markerColors[1][2]);    //set markers
-    if ((i == secondLED) && !smoothHands)    //skip if smooth hands enabled
+    if ((i == secondLED) && !smoothHands)    // skip if smooth hands enabled
       LED[i].addTempColor(colors[2][0], colors[2][1], colors[2][2]);
     if ((i == minuteLED) && !smoothHands)
       LED[i].addTempColor(colors[1][0], colors[1][1], colors[1][2]);
@@ -234,7 +251,10 @@ void setHands() {
   }
 }
 
-void setWideHourHand() {    //sets pixels on either side of the hour
+void setWideHourHand() {
+  /*
+   * Set pixels on either side of the 'hour' pixel
+   */
   for (byte i = 0; i < 60; i++) {
     if ((abs(i - hourLED) == 1) || (abs(i - hourLED) == 59))
       LED[i].addTempColor(colors[0][0], colors[0][1], colors[0][2]);
@@ -259,13 +279,11 @@ void setSmoothMinuteHand() {
     colors[1][2] * currentTick / tickRate
     };
   for (byte i = 0; i < 60; i++) {
-    if ((i-1) == minuteLED || (i+59) == minuteLED)            //leading pixel
+    if ((i-1) == minuteLED || (i+59) == minuteLED)          // leading pixel
       LED[i].addTempColor(tempColorsLeading[0], tempColorsLeading[1], tempColorsLeading[2]);
     if (i == minuteLED)
-//    if (i == minuteLED)                                       //actual pixel
       LED[i].addTempColor(colors[1][0], colors[1][1], colors[1][2]);
-//      LED[i].addTempColor(tempColorsLeading[0], tempColorsLeading[1], tempColorsLeading[2]);
-    if (((i + 1) == minuteLED) || ((i - 59) == minuteLED))    //trailing pixel
+    if (((i + 1) == minuteLED) || ((i - 59) == minuteLED))  // trailing pixel
       LED[i].addTempColor(tempColorsTrailing[0], tempColorsTrailing[1], tempColorsTrailing[2]);
   }
 }
@@ -279,7 +297,7 @@ void setSmoothSecondHand() {
     oldMillis = millis();
     millisCount = 0;
   }
-  byte currentTick = tickRate * millisCount / 1000;   //this isn't the ACTUAL tick, just what the tick should be.
+  byte currentTick = tickRate * millisCount / 1000;   // this isn't the ACTUAL tick, just what the tick should be.
   byte tempColorsTrailing[] = {
     (colors[2][0] * (tickRate - currentTick)) / tickRate,
     (colors[2][1] * (tickRate - currentTick)) / tickRate,
@@ -291,9 +309,9 @@ void setSmoothSecondHand() {
     colors[2][2] * currentTick / tickRate
     };
   for (byte i = 0; i < 60; i++) {
-    if (i == secondLED)    //leading pixel
+    if (i == secondLED)    // leading pixel
       LED[i].addTempColor(tempColorsLeading[0], tempColorsLeading[1], tempColorsLeading[2]);
-    if (((i + 1) == secondLED) || ((i - 59) == secondLED))   //trailing pixel
+    if (((i + 1) == secondLED) || ((i - 59) == secondLED))   // trailing pixel
       LED[i].addTempColor(tempColorsTrailing[0], tempColorsTrailing[1], tempColorsTrailing[2]);
   }
 }
@@ -302,7 +320,7 @@ void loop () {
   strip.setBrightness(getAmbientLight());
   if (randomColors && hourLED == 0 && minuteLED == 0 && secondLED == 0) changeColors();
   updateClock();
-  for (byte i = 0; i < 60; i++) LED[i].clearPixel();    //reset pixels before beginning
+  for (byte i = 0; i < 60; i++) LED[i].clearPixel();    // reset pixels before beginning
   setHands();
   for (byte i = 0; i < 60; i++) LED[i].setPixel();
   strip.show();
